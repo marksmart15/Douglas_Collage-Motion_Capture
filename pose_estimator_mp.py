@@ -1,5 +1,4 @@
 # pose_estimator_mp.py
-
 import cv2
 import mediapipe as mp
 import math
@@ -104,39 +103,27 @@ class PoseEstimatorMP:
             cv2.putText(frame, f'{angle_change:.2f}',
                         (joint_x, joint_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1, cv2.LINE_AA)
     
-    def export_data_to_csv(self):
+
+    def save_data_after_estimation(self):
         if self.save_location:
-            base_name, ext = os.path.splitext(self.file_name)
-            if not ext:
-                ext = ".csv"
-
-            file_path = os.path.join(self.save_location, self.file_name)
-
-            # Handle filename collisions
-            count = 1
-            while os.path.exists(file_path):
-                file_path = os.path.join(self.save_location, f"{base_name}_{count}{ext}")
-                count += 1
+            default_file_name = os.path.join(self.save_location, "default_name.csv")
         else:
-            self.save_location = filedialog.askdirectory()
-            file_path = os.path.join(self.save_location, self.file_name)
+            default_file_name = "Output.csv"
 
-            # Handle filename collisions
-            base_name, ext = os.path.splitext(self.file_name)
-            if not ext:
-                ext = ".csv"
+        file_path = filedialog.asksaveasfilename(
+            initialdir=self.save_location,
+            title="Save Motion Data",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+            defaultextension=".csv",
+            initialfile=default_file_name  # Set the default file name
+        )
 
-            count = 1
-            while os.path.exists(file_path):
-                file_path = os.path.join(self.save_location, f"{base_name}_{count}{ext}")
-                count += 1
+        if file_path:
+            with open(file_path, mode='w', newline='') as csv_file:
+                fieldnames = ['Timestamp', 'Angle Change', 'Joint Position']
+                writer = csv.writer(csv_file)
+                writer.writerow(fieldnames)
 
-        with open(file_path, mode='w', newline='') as csv_file:
-            fieldnames = ['Timestamp', 'Angle Change', 'Joint Position']
-            writer = csv.writer(csv_file)
-            writer.writerow(fieldnames)
-
-            for row in self.data:
-                # Round Timestamp to the nearest hundredth, others to the nearest tenth
-                rounded_row = [round(value, 2) if index == 0 else round(value, 1) if isinstance(value, (float, int)) else value for index, value in enumerate(row)]
-                writer.writerow(rounded_row)
+                for row in self.data:
+                    rounded_row = [round(value, 2) if index == 0 else round(value, 1) if isinstance(value, (float, int)) else value for index, value in enumerate(row)]
+                    writer.writerow(rounded_row)
