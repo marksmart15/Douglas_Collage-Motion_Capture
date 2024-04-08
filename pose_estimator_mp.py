@@ -160,9 +160,10 @@ class PoseEstimatorMP:
             self.data.append([timestamp, adjusted_distance_x, adjusted_distance_y, angle,])
 
             # Draw the chosen joint and adjusted distance on the frame
-            joint_x, joint_y = int(joint_elbow_position[0] * frame.shape[1]), int(joint_elbow_position[1] * frame.shape[0])
-            cv2.putText(frame, f'Angle: {angle:.2f}',
-                        (joint_x, joint_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1, cv2.LINE_AA)
+            if not chosen_joint == "SKELETON":
+                joint_x, joint_y = int(joint_elbow_position[0] * frame.shape[1]), int(joint_elbow_position[1] * frame.shape[0])
+                cv2.putText(frame, f'Angle: {angle:.2f}',
+                            (joint_x, joint_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1, cv2.LINE_AA)
         
     def is_file_open(self, file_path):
         try:

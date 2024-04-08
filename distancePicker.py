@@ -10,9 +10,9 @@ class PointSelectorApp(QMainWindow):
     DistanceUser = pyqtSignal(float)
     unitChanged = pyqtSignal(str)
     
-    def __init__(self, camera_index, measurement_unit="cm"):
+    def __init__(self, video_source, measurement_unit="cm"):
         super(PointSelectorApp, self).__init__()
-        self.cap = cv2.VideoCapture(camera_index)
+        self.video_source = video_source
         self.points = []
         self.dragging_point = None
         self.measurement_unit = measurement_unit
@@ -37,7 +37,33 @@ class PointSelectorApp(QMainWindow):
         # Set the initial window size to be half the size of the screen
         screen_geometry = QDesktopWidget().screenGeometry()
         self.resize(screen_geometry.width() // 2, screen_geometry.height() // 2)
+
+        # Initialize video capture
+        self.init_video_capture()
+
+    def init_video_capture(self):
+        if isinstance(self.video_source, int):  # Check if video_source is a camera index
+            self.cap = cv2.VideoCapture(self.video_source)
+            if not self.cap.isOpened():
+                raise ValueError("Error opening camera")
+        else:
+            print(self.video_source)
+            image = cv2.imread(self.video_source)
+            if image is None:
+                raise ValueError("Error loading image")
+            # Convert the image to RGB format
+            image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+            # Display the initial image
+            self.display_image(image_rgb)
+
+    def display_image(self, image):
+        # Convert the image to QImage format
+        q_image = QImage(image.data, image.shape[1], image.shape[0], QImage.Format_RGB888)
         
+        # Set the image to the QLabel
+        self.image_label.setPixmap(QPixmap.fromImage(q_image))
+
 
     def setup_ui(self):
         layout = QVBoxLayout()

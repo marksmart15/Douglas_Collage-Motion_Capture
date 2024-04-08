@@ -29,7 +29,9 @@ def get_joint_combinations(chosen_joint):
         return "RIGHT_KNEE", "RIGHT_HEEL", "RIGHT_ANKLE"
     elif chosen_joint == "LEFT_ANKLE":
         return "LEFT_KNEE", "LEFT_HEEL", "LEFT_ANKLE"
-
+    
+    elif chosen_joint == "SKELETON":
+        return "RIGHT_SHOULDER", "LEFT_ELBOW", "LEFT_SHOULDER"
 
     # Add more cases for other joints as needed
     else:

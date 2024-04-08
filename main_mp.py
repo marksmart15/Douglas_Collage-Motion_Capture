@@ -7,14 +7,42 @@ import sys
 from pose_estimator_mp import PoseEstimatorMP
 from distancePicker import PointSelectorApp
 
-from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QComboBox, QPushButton, QCheckBox, QLineEdit, QErrorMessage, QGroupBox, QMainWindow, QGraphicsScene, QGraphicsView, QGraphicsPixmapItem
+from PyQt5.QtWidgets import QApplication,QFileDialog, QWidget, QLabel, QVBoxLayout, QComboBox, QPushButton, QCheckBox, QLineEdit, QErrorMessage, QGroupBox, QMainWindow, QGraphicsScene, QGraphicsView, QGraphicsPixmapItem
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QImage, QPixmap
 
 class VideoImgManager:
     def __init__(self):
         self.POSE_ESTIMATOR = PoseEstimatorMP()
+        
+    def show_frame_fullscreen(self, frame):
+        # Get the screen resolution
+        screen_width, screen_height = 1920, 1080  # You can replace these values with the actual screen resolution
 
+        # Get the frame dimensions
+        frame_width, frame_height = frame.shape[1], frame.shape[0]
+
+        # Calculate the scaling factors for width and height
+        scale_width = screen_width / frame_width
+        scale_height = screen_height / frame_height
+
+        # Choose the minimum scaling factor to maintain the aspect ratio
+        min_scale = min(scale_width, scale_height)
+
+        # Calculate the new dimensions
+        new_width = int(frame_width * min_scale)
+        new_height = int(frame_height * min_scale)
+
+        # Resize the frame to fit the screen
+        resized_frame = cv2.resize(frame, (new_width, new_height))
+
+        # Create a full-screen window
+        cv2.namedWindow('Pose Landmarker', cv2.WND_PROP_FULLSCREEN)
+        cv2.setWindowProperty('Pose Landmarker', cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+
+        # Show the resized frame in the full-screen window
+        cv2.imshow('Pose Landmarker', resized_frame)
+        
     def start_video_recording(self, pose_estimator, videoType, save_data, data_points_per_second=None):
         cap = cv2.VideoCapture(videoType)
 
@@ -45,7 +73,7 @@ class VideoImgManager:
             # Draw the landmarks on the frame
             mp.solutions.drawing_utils.draw_landmarks(frame, results.pose_landmarks, mp.solutions.pose.POSE_CONNECTIONS)
 
-            cv2.imshow('Pose Landmarker', frame)
+            self.show_frame_fullscreen(frame)
 
             if cv2.waitKey(1) & 0xFF == 27:  # 'Esc' key
                 break
@@ -67,7 +95,9 @@ class GUI(QWidget):
         self.save_location = ""
         self.file_name = ""
         self.data_points_var = ""
-
+        self.video_file_path = ""
+        self.reference_frame = None
+           
         self.init_ui()
 
     def init_ui(self):
@@ -93,14 +123,14 @@ class GUI(QWidget):
         """)
 
         # Create widgets
-        self.label_device = QLabel("Select Video Device:")
+        self.label_device = QLabel("Or Select Video Device:")
         self.device_combobox = QComboBox()
         video_devices = self.list_video_devices()
         self.device_combobox.addItems(video_devices)
 
         self.label_joint = QLabel("Select Joint:")
         self.joint_combobox = QComboBox()
-        self.joint_combobox.addItems(["LEFT_SHOULDER", "RIGHT_SHOULDER", "LEFT_ELBOW", "RIGHT_ELBOW", "RIGHT_WRIST", "LEFT_WRIST", "RIGHT_HIP", "LEFT_HIP", "RIGHT_KNEE", "LEFT_KNEE", "RIGHT_ANKLE", "LEFT_ANKLE"])
+        self.joint_combobox.addItems(["SKELETON", "LEFT_SHOULDER", "RIGHT_SHOULDER", "LEFT_ELBOW", "RIGHT_ELBOW", "RIGHT_WRIST", "LEFT_WRIST", "RIGHT_HIP", "LEFT_HIP", "RIGHT_KNEE", "LEFT_KNEE", "RIGHT_ANKLE", "LEFT_ANKLE"])
 
         #self.label_axis = QLabel("Select Axis:")
         #self.axis_combobox = QComboBox()
@@ -112,6 +142,13 @@ class GUI(QWidget):
         self.save_data_checkbox = QCheckBox("Save Data")
         self.label_data_points = QLabel("Data Points Per Second:")
         self.entry_data_points = QLineEdit()
+        
+        self.label_video_file = QLabel("Select Video File:")
+        self.label_selected_file = QLabel("")
+        self.button_browse_video = QPushButton("Browse .mp4, .avi and .mkv")
+        self.button_browse_video.clicked.connect(self.browse_video_file)
+
+        # Add widgets to the layout
 
         self.button_start = QPushButton("Start Estimation")
         self.button_start.clicked.connect(self.start_estimation)
@@ -121,6 +158,9 @@ class GUI(QWidget):
         
         # Layout for the inner box
         inner_layout = QVBoxLayout(inner_box)
+        inner_layout.addWidget(self.label_video_file)
+        inner_layout.addWidget(self.button_browse_video)
+        inner_layout.addWidget(self.label_selected_file)
         inner_layout.addWidget(self.label_device)
         inner_layout.addWidget(self.device_combobox)
         inner_layout.addWidget(self.label_joint)
@@ -186,8 +226,10 @@ class GUI(QWidget):
         return devices
     
     def start_distance_picker(self):
+
         video_device = int(self.device_combobox.currentText().split(":")[0].split(" ")[-1])
         self.distance_picker_dialog = PointSelectorApp(video_device)
+        
         self.distance_picker_dialog.DistanceChanged.connect(self.handle_distance_changed)
         self.distance_picker_dialog.DistanceUser.connect(self.handle_distance_user)
         self.distance_picker_dialog.unitChanged.connect(self.handle_unit_changed)
@@ -205,6 +247,13 @@ class GUI(QWidget):
         #print("unit ",unit)
         self.unit = unit
     
+    def browse_video_file(self):
+        options = QFileDialog.Options()
+        file_path, _ = QFileDialog.getOpenFileName(self, "Select Video File", "", "Video Files (*.mp4 *.avi *.mkv)", options=options)
+        if file_path:
+            self.video_file_path = file_path
+            self.label_selected_file.setText(os.path.basename(file_path))  # Display only the file name
+            
     def start_estimation(self):
         if self.percentage == -1:
             self.has_not_happend = False
@@ -228,8 +277,14 @@ class GUI(QWidget):
             else:
                 file_name = ""  # No file name if not saving data
                 save_location = ""
-
-            self.main_app.start_estimation(chosen_joint, chosen_axis, video_device, save_data, save_location, file_name,percentage,userDistance,unit, data_points_per_second)
+                
+            if self.video_file_path:
+                # Get the selected video file path
+                video_type = self.video_file_path
+                # Start estimation with the selected video file
+                self.main_app.start_estimation(chosen_joint, chosen_axis, video_type, save_data, save_location, file_name, percentage, userDistance, unit, data_points_per_second=None)
+            else:
+                self.main_app.start_estimation(chosen_joint, chosen_axis, video_device, save_data, save_location, file_name,percentage,userDistance,unit, data_points_per_second)
 
     def show_error(self, message):
         error_dialog = QErrorMessage(self)
